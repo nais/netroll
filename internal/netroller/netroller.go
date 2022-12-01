@@ -59,7 +59,7 @@ func (n *Netroller) ensureNetworkPolicy(v any) error {
 
 	netpol, err := n.netpolInfo(sqlInstance)
 	if err != nil {
-		n.log.WithError(err).Error("failed to get required networkPolicy info, ignoring")
+		n.log.WithError(err).Debug("failed to get required networkPolicy info, ignoring")
 		return nil
 	}
 
