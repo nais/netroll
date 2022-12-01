@@ -9,10 +9,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/nais/netroll/internal/netroller"
 	"github.com/sirupsen/logrus"
+	"k8s.io/client-go/kubernetes"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/tools/cache"
@@ -32,7 +33,7 @@ var (
 
 func init() {
 	flag.StringVar(&bindAddress, "bind-address", ":8080", "Bind address")
-	flag.StringVar(&logLevel, "log-level", "info", "Which log level to output")
+	flag.StringVar(&logLevel, "log-level", "debug", "Which log level to output")
 }
 
 func main() {
@@ -57,10 +58,10 @@ func main() {
 		}
 	}
 
-	//k8sClient, err := kubernetes.NewForConfig(kubeConfig)
-	//if err != nil {
-	//	log.WithError(err).Fatal("setting up k8s client")
-	//}
+	k8sClient, err := kubernetes.NewForConfig(kubeConfig)
+	if err != nil {
+		log.WithError(err).Fatal("setting up k8s client")
+	}
 
 	dynamicClient, err := dynamic.NewForConfig(kubeConfig)
 	if err != nil {
@@ -78,10 +79,11 @@ func main() {
 	informer := resource.Informer()
 	informer.SetWatchErrorHandler(errorHandler)
 
+	nr := netroller.New(log, k8sClient)
+
 	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    addSQLInstance,
-		UpdateFunc: updateSQLInstance,
-		DeleteFunc: deleteSQLInstance,
+		AddFunc:    nr.Add,
+		UpdateFunc: nr.Update,
 	})
 
 	go informer.Run(ctx.Done())
@@ -94,60 +96,6 @@ func main() {
 		case <-ctx.Done():
 			return
 		}
-	}
-}
-
-func ensureNetpol(v any) error {
-	fmt.Println("ensuring netpol")
-	sqlInstance := v.(*unstructured.Unstructured)
-
-	fmt.Println("ownerReference", sqlInstance.GetOwnerReferences()) // need this to know which application we are creating this for
-	// ensure ownerReference refers to Application or NaisJob
-
-	if sqlInstance.GetOwnerReferences() == nil {
-		return nil
-	}
-
-	if len(sqlInstance.GetOwnerReferences()) != 1 {
-		return nil
-	}
-
-	o := sqlInstance.GetOwnerReferences()[0]
-	if o.Kind != "Application" && o.Kind != "NaisJob" {
-		return nil
-	}
-
-	status := sqlInstance.Object["status"]
-	if status == nil {
-		fmt.Println("sqlInstance has no status")
-		return nil
-	}
-	m := status.(map[string]any)
-	ip := m["publicIpAddress"]
-	// check if publicIpAddress is available (on newly created instances, this status field may not be set yet)
-
-	fmt.Println("ip", ip)
-	fmt.Println("wl name", o.Name)
-	fmt.Println("namespace", sqlInstance.GetNamespace()) // which namespace to create netpol in
-
-	return nil
-}
-
-func deleteSQLInstance(v any) {
-	fmt.Println("delete")
-}
-
-func updateSQLInstance(old any, new any) {
-	fmt.Println("update")
-	if err := ensureNetpol(new); err != nil {
-		fmt.Println("uhoh")
-	}
-}
-
-func addSQLInstance(v any) {
-	fmt.Println("add")
-	if err := ensureNetpol(v); err != nil {
-		fmt.Println("uhoh")
 	}
 }
 
