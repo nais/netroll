@@ -12,6 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/tools/cache"
@@ -96,16 +97,58 @@ func main() {
 	}
 }
 
-func deleteSQLInstance(obj any) {
+func ensureNetpol(v any) error {
+	fmt.Println("ensuring netpol")
+	sqlInstance := v.(*unstructured.Unstructured)
+
+	fmt.Println("ownerReference", sqlInstance.GetOwnerReferences()) // need this to know which application we are creating this for
+	// ensure ownerReference refers to Application or NaisJob
+
+	if sqlInstance.GetOwnerReferences() == nil {
+		return nil
+	}
+
+	if len(sqlInstance.GetOwnerReferences()) != 1 {
+		return nil
+	}
+
+	o := sqlInstance.GetOwnerReferences()[0]
+	if o.Kind != "Application" && o.Kind != "NaisJob" {
+		return nil
+	}
+
+	status := sqlInstance.Object["status"]
+	if status == nil {
+		fmt.Println("sqlInstance has no status")
+		return nil
+	}
+	m := status.(map[string]any)
+	ip := m["publicIpAddress"]
+	// check if publicIpAddress is available (on newly created instances, this status field may not be set yet)
+
+	fmt.Println("ip", ip)
+	fmt.Println("wl name", o.Name)
+	fmt.Println("namespace", sqlInstance.GetNamespace()) // which namespace to create netpol in
+
+	return nil
+}
+
+func deleteSQLInstance(v any) {
 	fmt.Println("delete")
 }
 
-func updateSQLInstance(obj any, obj2 any) {
+func updateSQLInstance(old any, new any) {
 	fmt.Println("update")
+	if err := ensureNetpol(new); err != nil {
+		fmt.Println("uhoh")
+	}
 }
 
-func addSQLInstance(obj any) {
+func addSQLInstance(v any) {
 	fmt.Println("add")
+	if err := ensureNetpol(v); err != nil {
+		fmt.Println("uhoh")
+	}
 }
 
 func errorHandler(r *cache.Reflector, err error) {

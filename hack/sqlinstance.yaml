@@ -2,6 +2,11 @@ apiVersion: sql.cnrm.cloud.google.com/v1beta1
 kind: SQLInstance
 metadata:
   name: instance
+  ownerReferences:
+  - apiVersion: nais.io/v1alpha1
+    kind: Application
+    name: contests
+    uid: 3103c3cc-280d-4d8d-bfb7-193ea7dc0207
 spec:
   databaseVersion: POSTGRES_14
   region: europe-north1
