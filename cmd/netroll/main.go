@@ -57,6 +57,7 @@ func main() {
 			log.WithError(err).Fatal("failed to get kubeconfig")
 		}
 	}
+	log.Debugf("starting netroller with kubeconfig: %s", kubeConfig.Host)
 
 	k8sClient, err := kubernetes.NewForConfig(kubeConfig)
 	if err != nil {
