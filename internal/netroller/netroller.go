@@ -38,7 +38,11 @@ func (n *Netroller) Add(new any) {
 }
 
 func (n *Netroller) Update(old any, new any) {
-	n.log.Debugf("update")
+	oldInstance := old.(*unstructured.Unstructured)
+	if oldInstance.GetDeletionTimestamp() != nil {
+		n.log.Debugf("resource %s is being deleted, ignoring", oldInstance.GetName())
+		return
+	}
 	if err := n.ensureNetworkPolicy(new); err != nil {
 		n.log.Errorf("uhoh")
 	}
