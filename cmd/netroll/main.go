@@ -4,14 +4,16 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
-	"os"
-	"path/filepath"
-	"time"
 
 	// Load all client-go auth plugins
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -19,60 +21,38 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/util/homedir"
 )
 
-type Config struct {
-	BindAddress  string
-	LogLevel     string
-	GCPProjectID string
-	PubsubTopic  string
-	Production   bool
-	Env          string
-}
-
-var cfg = DefaultConfig()
+var (
+	logLevel    string
+	bindAddress string
+)
 
 func init() {
-	flag.StringVar(&cfg.BindAddress, "bind-address", cfg.BindAddress, "Bind address")
-	flag.StringVar(&cfg.LogLevel, "log-level", "info", "which log level to output")
-	flag.StringVar(&cfg.GCPProjectID, "project-id", "nais-local-dev", "Google project ID")
-	flag.BoolVar(&cfg.Production, "production", false, "Run in production mode")
-	flag.StringVar(&cfg.Env, "env", "dev", "Environment name as defined in Fasit")
+	flag.StringVar(&bindAddress, "bind-address", ":8080", "Bind address")
+	flag.StringVar(&logLevel, "log-level", "info", "Which log level to output")
 }
 
 func main() {
 	flag.Parse()
 
-	kubeconfigPath := "" //flag.Lookup("kubeconfig").Value.String()
-	if kubeconfigPath == "" {
-		if envConfig := os.Getenv("KUBECONFIG"); envConfig != "" {
-			kubeconfigPath = envConfig
-		} else if home := homedir.HomeDir(); home != "" {
-			kubeconfigPath = filepath.Join(home, ".kube", "config")
-		}
-	}
-
-	fmt.Println("Using", kubeconfigPath)
-
-	// ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-	ctx := context.Background()
-	// defer cancel()
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	defer cancel()
 
 	log := newLogger()
 
 	var kubeConfig *rest.Config
 	var err error
 
-	if cfg.Production {
+	if envConfig := os.Getenv("KUBECONFIG"); envConfig != "" {
+		kubeConfig, err = clientcmd.BuildConfigFromFlags("", envConfig)
+		if err != nil {
+			panic(err.Error())
+		}
+	} else {
 		kubeConfig, err = rest.InClusterConfig()
 		if err != nil {
 			log.WithError(err).Fatal("failed to get kubeconfig")
-		}
-	} else {
-		kubeConfig, err = clientcmd.BuildConfigFromFlags("", kubeconfigPath)
-		if err != nil {
-			panic(err.Error())
 		}
 	}
 
@@ -142,13 +122,6 @@ func newLogger() *logrus.Logger {
 	}
 	log.SetLevel(l)
 	return log
-}
-
-func DefaultConfig() Config {
-	return Config{
-		BindAddress: ":8080",
-		LogLevel:    "info",
-	}
 }
 
 func waitForCacheSync(stop <-chan struct{}, cacheSyncs ...cache.InformerSynced) bool {
