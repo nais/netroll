@@ -93,27 +93,26 @@ func (n *Netroller) netpolInfo(sqlInstance *unstructured.Unstructured) (*NetpolI
 
 func (n *Netroller) createNetworkPolicy(ctx context.Context, ni *NetpolInfo) error {
 	api := n.k8sClient.NetworkingV1().NetworkPolicies(ni.Namespace)
+	np := networkPolicy(ni)
 
-	existing, err := api.Get(ctx, ni.Name(), v1.GetOptions{})
+	_, err := api.Get(ctx, ni.Name(), v1.GetOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		return fmt.Errorf("getting networkPolicy %s: %w", ni.Name(), err)
 	}
 
-	np := networkPolicy(ni)
-
-	if existing != nil {
+	if errors.IsNotFound(err) {
+		_, err = api.Create(ctx, np, v1.CreateOptions{})
+		if err != nil {
+			return fmt.Errorf("creating networkPolicy %s: %w", ni.Name(), err)
+		}
+		return nil
+	} else {
 		_, err = api.Update(ctx, np, v1.UpdateOptions{})
 		if err != nil {
 			return fmt.Errorf("updating networkPolicy %s: %w", ni.Name(), err)
 		}
 		return nil
 	}
-
-	_, err = n.k8sClient.NetworkingV1().NetworkPolicies(ni.Namespace).Create(ctx, np, v1.CreateOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to create networkPolicy for sqlInstance %s: %w", ni.InstanceName, err)
-	}
-	return nil
 }
 
 func networkPolicy(i *NetpolInfo) *networkingv1.NetworkPolicy {
