@@ -9,6 +9,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic/dynamicinformer"
@@ -18,7 +20,6 @@ import (
 	// Load all client-go auth plugins
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 )
@@ -43,7 +44,6 @@ func main() {
 
 	var kubeConfig *rest.Config
 	var err error
-
 	if envConfig := os.Getenv("KUBECONFIG"); envConfig != "" {
 		kubeConfig, err = clientcmd.BuildConfigFromFlags("", envConfig)
 		if err != nil {
@@ -116,7 +116,7 @@ func newLogger() *logrus.Logger {
 	log := logrus.StandardLogger()
 	log.SetFormatter(&logrus.JSONFormatter{})
 
-	l, err := logrus.ParseLevel(cfg.LogLevel)
+	l, err := logrus.ParseLevel(logLevel)
 	if err != nil {
 		log.Fatal(err)
 	}
