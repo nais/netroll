@@ -1,0 +1,38 @@
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: netroll
+rules:
+  - apiGroups:
+      - sql.cnrm.cloud.google.com
+    resources:
+      - sqlinstances
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - networkpolicies
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: netroll
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: netroll
+subjects:
+  - kind: ServiceAccount
+    name: netroll
+    namespace: "{{ .Release.Namespace }}"
+---

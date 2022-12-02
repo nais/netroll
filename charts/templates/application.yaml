@@ -16,3 +16,7 @@ spec:
     requests:
       cpu: 100m
       memory: 64Mi
+  accessPolicy:
+    outbound:
+      external:
+        - host: kubernetes.default.svc.cluster.local
