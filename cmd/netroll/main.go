@@ -51,13 +51,14 @@ func main() {
 		if err != nil {
 			panic(err.Error())
 		}
+		log.Debugf("starting netroller with kubeconfig: %s", envConfig)
 	} else {
 		kubeConfig, err = rest.InClusterConfig()
 		if err != nil {
 			log.WithError(err).Fatal("failed to get kubeconfig")
 		}
+		log.Debugf("starting netroller with in-cluster config: %s", kubeConfig.Host)
 	}
-	log.Debugf("starting netroller with kubeconfig: %s", kubeConfig.Host)
 
 	k8sClient, err := kubernetes.NewForConfig(kubeConfig)
 	if err != nil {
@@ -90,14 +91,7 @@ func main() {
 	go informer.Run(ctx.Done())
 	waitForCacheSync(ctx.Done(), informer.HasSynced)
 
-	ticker := time.NewTicker(15 * time.Second)
-	for {
-		select {
-		case <-ticker.C:
-		case <-ctx.Done():
-			return
-		}
-	}
+	<-ctx.Done()
 }
 
 func errorHandler(r *cache.Reflector, err error) {
