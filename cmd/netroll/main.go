@@ -51,13 +51,13 @@ func main() {
 		if err != nil {
 			panic(err.Error())
 		}
-		log.Debugf("starting netroller with kubeconfig: %s", envConfig)
+		log.Infof("starting netroller with kubeconfig: %s", envConfig)
 	} else {
 		kubeConfig, err = rest.InClusterConfig()
 		if err != nil {
 			log.WithError(err).Fatal("failed to get kubeconfig")
 		}
-		log.Debugf("starting netroller with in-cluster config: %s", kubeConfig.Host)
+		log.Infof("starting netroller with in-cluster config: %s", kubeConfig.Host)
 	}
 
 	k8sClient, err := kubernetes.NewForConfig(kubeConfig)

@@ -3,6 +3,7 @@ package netroller
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/sirupsen/logrus"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -31,21 +32,18 @@ func (ni *NetpolInfo) Name() string {
 }
 
 func (n *Netroller) Add(new any) {
-	n.log.Debugf("update")
-	if err := n.ensureNetworkPolicy(new); err != nil {
-		n.log.Errorf("uhoh")
-	}
+	n.log.Debug("received add event")
+	n.ensureNetworkPolicy(new)
 }
 
 func (n *Netroller) Update(old any, new any) {
+	n.log.Debug("received update event")
 	oldInstance := old.(*unstructured.Unstructured)
 	if oldInstance.GetDeletionTimestamp() != nil {
-		n.log.Debugf("resource %s is being deleted, ignoring", oldInstance.GetName())
+		n.log.Infof("resource %s in namespace %s is being deleted, ignoring", oldInstance.GetName(), oldInstance.GetNamespace())
 		return
 	}
-	if err := n.ensureNetworkPolicy(new); err != nil {
-		n.log.Errorf("uhoh")
-	}
+	n.ensureNetworkPolicy(new)
 }
 
 func New(log *logrus.Logger, k8sClient *kubernetes.Clientset) *Netroller {
@@ -55,24 +53,28 @@ func New(log *logrus.Logger, k8sClient *kubernetes.Clientset) *Netroller {
 	}
 }
 
-func (n *Netroller) ensureNetworkPolicy(v any) error {
+func (n *Netroller) ensureNetworkPolicy(v any) {
 	sqlInstance := v.(*unstructured.Unstructured)
-	n.log.Debugf("ensuring networkPolicy for sqlInstance %s", sqlInstance.GetName())
+	n.log.Infof("ensuring networkPolicy for sqlInstance %s in namespace %s", sqlInstance.GetName(), sqlInstance.GetNamespace())
 
 	ctx := context.Background()
 
 	netpol, err := n.netpolInfo(sqlInstance)
+
+	if err != nil {
+		log.Fatalf(err.Error())
+	}
+
 	if err != nil {
 		n.log.WithError(err).Debug("failed to get required networkPolicy info, ignoring")
-		return nil
+		return
 	}
 
 	if err := n.createNetworkPolicy(ctx, netpol); err != nil {
-		n.log.WithError(err).Errorf("failed to create networkPolicy %s", netpol.Name())
+		n.log.WithError(err).Errorf("failed to create networkPolicy '%s'", netpol.Name())
 	}
 
-	n.log.Debugf("ensured networkPolicy %s", netpol.Name())
-	return nil
+	n.log.Infof("ensured networkPolicy %s in namespace %s", netpol.Name(), netpol.Namespace)
 }
 
 func (n *Netroller) netpolInfo(sqlInstance *unstructured.Unstructured) (*NetpolInfo, error) {
@@ -101,7 +103,7 @@ func (n *Netroller) createNetworkPolicy(ctx context.Context, ni *NetpolInfo) err
 
 	_, err := api.Get(ctx, ni.Name(), v1.GetOptions{})
 	if err != nil && !errors.IsNotFound(err) {
-		return fmt.Errorf("getting networkPolicy %s: %w", ni.Name(), err)
+		return fmt.Errorf("getting networkPolicy '%s': %w", ni.Name(), err)
 	}
 
 	if errors.IsNotFound(err) {
@@ -109,12 +111,14 @@ func (n *Netroller) createNetworkPolicy(ctx context.Context, ni *NetpolInfo) err
 		if err != nil {
 			return fmt.Errorf("creating networkPolicy %s: %w", ni.Name(), err)
 		}
+		n.log.Infof("created networkPolicy %s in namespace %s", ni.Name(), ni.Namespace)
 		return nil
 	} else {
 		_, err = api.Update(ctx, np, v1.UpdateOptions{})
 		if err != nil {
 			return fmt.Errorf("updating networkPolicy %s: %w", ni.Name(), err)
 		}
+		n.log.Infof("updated networkPolicy %s in namespace %s", ni.Name(), ni.Namespace)
 		return nil
 	}
 }
@@ -130,6 +134,9 @@ func networkPolicy(i *NetpolInfo) *networkingv1.NetworkPolicy {
 					Name:       i.InstanceName,
 					UID:        i.InstanceUID,
 				},
+			},
+			Annotations: map[string]string{
+				"nais.io/created-by": "netroll",
 			},
 		},
 		Spec: networkingv1.NetworkPolicySpec{
