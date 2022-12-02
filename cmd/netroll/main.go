@@ -92,6 +92,7 @@ func main() {
 	waitForCacheSync(ctx.Done(), informer.HasSynced)
 
 	<-ctx.Done()
+	log.Info("shutting down")
 }
 
 func errorHandler(r *cache.Reflector, err error) {
