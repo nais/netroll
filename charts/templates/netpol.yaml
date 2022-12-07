@@ -4,14 +4,14 @@ metadata:
   name: netroll-apiserver
 spec:
   egress:
-  - ports:
-    - port: 443
-      protocol: TCP
-    to:
-    - ipBlock:
-        cidr: 172.16.1.2/32
+    - ports:
+        - port: 443
+          protocol: TCP
+      to:
+        - ipBlock:
+            cidr: {{ .Values.apiserverIP }}/32
   podSelector:
     matchLabels:
       app: netroll
   policyTypes:
-  - Egress
+    - Egress
