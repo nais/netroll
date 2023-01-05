@@ -3,8 +3,6 @@ package netroller
 import (
 	"context"
 	"fmt"
-	"log"
-
 	"github.com/sirupsen/logrus"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -12,6 +10,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+	"log"
+	"time"
 )
 
 type Netroller struct {
@@ -83,7 +83,7 @@ func (n *Netroller) netpolInfo(sqlInstance *unstructured.Unstructured) (*NetpolI
 		return nil, err
 	}
 
-	i, err := ip(sqlInstance)
+	i, err := n.publicIPStatus(sqlInstance)
 	if err != nil {
 		return nil, err
 	}
@@ -160,6 +160,30 @@ func networkPolicy(i *NetpolInfo) *networkingv1.NetworkPolicy {
 				networkingv1.PolicyTypeEgress,
 			},
 		},
+	}
+}
+
+func (n *Netroller) publicIPStatus(instance *unstructured.Unstructured) (string, error) {
+	ticker := time.NewTicker(30 * time.Second)
+	timeout := 15 * time.Minute
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-time.After(timeout):
+			return "", fmt.Errorf("instance connection failed after %s timeout", timeout)
+
+		case <-ticker.C:
+			in, err := ip(instance)
+			if err == nil {
+				n.log.Infof("instance %s connected successfully", instance.GetName())
+				return in, nil
+			}
+
+			if err != nil {
+				n.log.Warnf("failed to connect to instance, %s retying..", instance.GetName())
+			}
+		}
 	}
 }
 
