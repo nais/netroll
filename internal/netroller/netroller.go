@@ -166,22 +166,23 @@ func networkPolicy(i *NetpolInfo) *networkingv1.NetworkPolicy {
 func (n *Netroller) publicIPStatus(instance *unstructured.Unstructured) (string, error) {
 	ticker := time.NewTicker(30 * time.Second)
 	timeout := 15 * time.Minute
+	name := instance.GetName()
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-time.After(timeout):
-			return "", fmt.Errorf("instance connection failed after %s timeout", timeout)
+			return "", fmt.Errorf("instance %s status check failed after %s timeout", name, timeout)
 
 		case <-ticker.C:
 			in, err := ip(instance)
 			if err == nil {
-				n.log.Infof("instance %s connected successfully", instance.GetName())
+				n.log.Infof("instance %s public IP status is OK", name)
 				return in, nil
 			}
 
 			if err != nil {
-				n.log.Warnf("failed to connect to instance, %s retying..", instance.GetName())
+				n.log.Warnf("failed to check status for instance, %s retying..", name)
 			}
 		}
 	}
