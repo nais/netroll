@@ -15,8 +15,9 @@ import (
 )
 
 type Netroller struct {
-	log       *logrus.Logger
-	k8sClient *kubernetes.Clientset
+	log         *logrus.Logger
+	k8sClient   *kubernetes.Clientset
+	retryConfig *RetryConfig
 }
 
 type NetpolInfo struct {
@@ -25,6 +26,11 @@ type NetpolInfo struct {
 	Namespace    string
 	IP           string
 	Owner        string
+}
+
+type RetryConfig struct {
+	Ticker  *time.Ticker
+	Timeout time.Duration
 }
 
 func (ni *NetpolInfo) Name() string {
@@ -50,6 +56,10 @@ func New(log *logrus.Logger, k8sClient *kubernetes.Clientset) *Netroller {
 	return &Netroller{
 		log:       log,
 		k8sClient: k8sClient,
+		retryConfig: &RetryConfig{
+			Ticker:  time.NewTicker(30 * time.Second),
+			Timeout: 15 * time.Minute,
+		},
 	}
 }
 
@@ -83,7 +93,7 @@ func (n *Netroller) netpolInfo(sqlInstance *unstructured.Unstructured) (*NetpolI
 		return nil, err
 	}
 
-	i, err := n.publicIPStatus(sqlInstance)
+	publicIP, err := n.publicIPStatus(sqlInstance)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +102,7 @@ func (n *Netroller) netpolInfo(sqlInstance *unstructured.Unstructured) (*NetpolI
 		InstanceUID:  sqlInstance.GetUID(),
 		InstanceName: sqlInstance.GetName(),
 		Namespace:    sqlInstance.GetNamespace(),
-		IP:           i,
+		IP:           publicIP,
 		Owner:        o,
 	}, nil
 }
@@ -164,21 +174,19 @@ func networkPolicy(i *NetpolInfo) *networkingv1.NetworkPolicy {
 }
 
 func (n *Netroller) publicIPStatus(instance *unstructured.Unstructured) (string, error) {
-	ticker := time.NewTicker(30 * time.Second)
-	timeout := 15 * time.Minute
 	name := instance.GetName()
-	defer ticker.Stop()
+	defer n.retryConfig.Ticker.Stop()
 
 	for {
 		select {
-		case <-time.After(timeout):
-			return "", fmt.Errorf("instance %s status check failed after %s timeout", name, timeout)
+		case <-time.After(n.retryConfig.Timeout):
+			return "", fmt.Errorf("instance %s status check failed after %s timeout", name, n.retryConfig.Timeout)
 
-		case <-ticker.C:
-			in, err := ip(instance)
+		case <-n.retryConfig.Ticker.C:
+			i, err := ip(instance)
 			if err == nil {
 				n.log.Infof("instance %s public IP status is OK", name)
-				return in, nil
+				return i, nil
 			}
 
 			if err != nil {
