@@ -79,7 +79,11 @@ func main() {
 	})
 
 	informer := resource.Informer()
-	informer.SetWatchErrorHandler(errorHandler)
+	err = informer.SetWatchErrorHandler(errorHandler)
+
+	if err != nil {
+		log.WithError(err).Fatal("setting up informer")
+	}
 
 	nr := netroller.New(log, k8sClient)
 
@@ -89,7 +93,10 @@ func main() {
 	})
 
 	go informer.Run(ctx.Done())
-	waitForCacheSync(ctx.Done(), informer.HasSynced)
+
+	if waitForCacheSync(ctx.Done(), informer.HasSynced) {
+		log.Info("cache synced")
+	}
 
 	<-ctx.Done()
 	log.Info("shutting down")
