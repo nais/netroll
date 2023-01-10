@@ -3,8 +3,6 @@ package netroller
 import (
 	"context"
 	"fmt"
-	"log"
-
 	"github.com/sirupsen/logrus"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -60,10 +58,6 @@ func (n *Netroller) ensureNetworkPolicy(v any) {
 	ctx := context.Background()
 
 	netpol, err := n.netpolInfo(sqlInstance)
-
-	if err != nil {
-		log.Fatalf(err.Error())
-	}
 
 	if err != nil {
 		n.log.WithError(err).Debug("failed to get required networkPolicy info, ignoring")
