@@ -1,11 +1,11 @@
 apiVersion: "nais.io/v1alpha1"
 kind: "Application"
 metadata:
-  name: netroll
+  name: {{ .Release.Name }}
   labels:
     team: nais
 spec:
-  image: "{{ .Values.image.repository }}/{{ .Values.image.name }}:{{ .Values.image.tag }}"
+  image: "{{ .Values.image.repository }}/{{ .Values.image.name }}:{{ .Chart.Version }}"
   replicas:
     min: 1
     max: 1

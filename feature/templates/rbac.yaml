@@ -2,7 +2,7 @@
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: netroll
+  name: {{ .Release.Name }}
 rules:
   - apiGroups:
       - sql.cnrm.cloud.google.com
@@ -26,13 +26,13 @@ rules:
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: netroll
+  name: {{ .Release.Name }}}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: netroll
+  name: {{ .Release.Name }}}
 subjects:
   - kind: ServiceAccount
-    name: netroll
+    name: {{ .Release.Name }}}
     namespace: "{{ .Release.Namespace }}"
 ---
