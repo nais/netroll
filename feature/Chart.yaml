@@ -2,4 +2,4 @@ apiVersion: v2
 name: netroll
 description: Creates network policies to allow communication from application to database
 type: application
-version: 1.0.0
+version: 1.0.1
