@@ -184,8 +184,8 @@ func owner(instance *unstructured.Unstructured) (string, error) {
 	}
 
 	o := instance.GetOwnerReferences()[0]
-	if o.Kind != "Application" && o.Kind != "NaisJob" {
-		return "", fmt.Errorf("sqlInstance %s has ownerReference of kind %s, expected Application or NaisJob", instance.GetName(), o.Kind)
+	if o.Kind != "Application" && o.Kind != "Naisjob" {
+		return "", fmt.Errorf("sqlInstance %s has ownerReference of kind %s, expected Application or Naisjob", instance.GetName(), o.Kind)
 	}
 	return o.Name, nil
 }
