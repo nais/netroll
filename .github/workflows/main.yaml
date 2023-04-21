@@ -3,13 +3,13 @@ on:
   push:
     branches:
       - main
+
 env:
-  NAME: netroll
-  REGISTRY: europe-north1-docker.pkg.dev/nais-io/nais/images
   BUILDER_IMG: "cgr.dev/chainguard/go:1.19"
   RUNNER_IMG: "cgr.dev/chainguard/static"
   BASEIMG_IDENTITY: "https://github.com/chainguard-images/images/.github/workflows/release.yaml@refs/heads/main"
   BASEIMG_ISSUER: "https://token.actions.githubusercontent.com"
+
 jobs:
   build:
     permissions:
@@ -27,47 +27,20 @@ jobs:
         run: cosign verify --certificate-identity ${{ env.BASEIMG_IDENTITY }} --certificate-oidc-issuer ${{ env.BASEIMG_ISSUER }} ${{ env.BUILDER_IMG }}
       - name: Verify runner image
         run: cosign verify --certificate-identity ${{ env.BASEIMG_IDENTITY }} --certificate-oidc-issuer ${{ env.BASEIMG_ISSUER }} ${{ env.RUNNER_IMG }}
-      - name: Create new version
-        run: |
-          echo "NEW_VERSION: $(date '+%Y.%-m.%-d')-$(git rev-parse --short HEAD)"
-          echo "NEW_VERSION=$(date '+%Y.%-m.%-d')-$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-          echo "# Created version: $(date '+%Y.%-m.%-d')-$(git rev-parse --short HEAD)" >> $GITHUB_STEP_SUMMARY
-      - id: "auth"
-        name: "Authenticate to Google Cloud"
-        uses: "google-github-actions/auth@e8df18b60c5dd38ba618c121b779307266153fbf" # ratchet:google-github-actions/auth@v1
+      - uses: nais/platform-build-push-sign@8b336817c5749f179373fd63a7f511bae7246f10 # ratchet:nais/platform-build-push-sign@main
+        id: build-push-sign
         with:
+          name: netroll
+          google_service_account: gh-netroll
           workload_identity_provider: ${{ secrets.NAIS_IO_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: "gh-${{ env.NAME }}@nais-io.iam.gserviceaccount.com"
-          token_format: "access_token"
-      - name: Set up Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@4b4e9c3e2d4531116a6f8ba8e71fc6e2cb6e6c8c # ratchet:docker/setup-buildx-action@v2
-      - name: Login to registry
-        uses: docker/login-action@f4ef78c080cd8ba55a85445d5b36e214a81df20a
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: "oauth2accesstoken"
-          password: "${{ steps.auth.outputs.access_token }}"
-      - name: Build and push
-        if: github.ref == 'refs/heads/main'
-        uses: docker/build-push-action@1104d471370f9806843c095c1db02b5a90c5f8b6 # ratchet:docker/build-push-action@v3
-        with:
-          context: .
-          file: Dockerfile
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.NAME }}:${{ env.NEW_VERSION }},${{ env.REGISTRY }}/${{ env.NAME }}:latest
-          labels: |
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ env.NEW_VERSION }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
       - uses: azure/setup-helm@18bc76811624f360dbd7f18c2d4ecb32c7b87bab # ratchet:azure/setup-helm@v1
         name: "Setup Helm"
         with:
           version: "3.8.0"
       - name: Build Chart
         run: |-
-          sed -i "s/^version: .*/version: ${{ env.NEW_VERSION }}/g" feature/Chart.yaml
+          sed -i "s/^version: .*/version: ${{ steps.build-push-sign.outputs.version }}/g" feature/Chart.yaml
           cat feature/Chart.yaml
           helm package feature
       - name: Push Chart
