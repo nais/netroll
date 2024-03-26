@@ -12,6 +12,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+const CreatedByAnnotation = "nais.io/created-by"
+
 type Netroller struct {
 	log       *logrus.Logger
 	k8sClient *kubernetes.Clientset
@@ -130,7 +132,7 @@ func networkPolicy(i *NetpolInfo) *networkingv1.NetworkPolicy {
 				},
 			},
 			Annotations: map[string]string{
-				"nais.io/created-by": "netroll",
+				CreatedByAnnotation: "netroll",
 			},
 		},
 		Spec: networkingv1.NetworkPolicySpec{

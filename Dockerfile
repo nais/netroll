@@ -18,6 +18,9 @@ RUN go build std
 # Copy rest of project
 COPY . /src
 
+# Run tests
+RUN make test
+
 # Build
 RUN go build -a -installsuffix cgo -o bin/netroll cmd/netroll/main.go
 
