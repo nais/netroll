@@ -28,7 +28,7 @@ jobs:
           name: ${{ env.NAME }}
           google_service_account: gh-${{ env.NAME }}
           workload_identity_provider: ${{ secrets.NAIS_IO_WORKLOAD_IDENTITY_PROVIDER }}
-          push: ${{ github.ref == 'refs/heads/main' && github.actor != 'dependabot[bot]' }}
+          push: ${{ github.actor != 'dependabot[bot]' && github.ref == 'refs/heads/main' }}
           cache_from: type=gha
           cache_to: type=gha,mode=max
       - uses: azure/setup-helm@v3
@@ -41,7 +41,7 @@ jobs:
           cat charts/Chart.yaml
           helm package charts
       - name: Push Chart
-        if: github.ref == 'refs/heads/main'
+        if: github.actor != 'dependabot[bot]' && github.ref == 'refs/heads/main'
         run: |-
           helm push ${{ env.NAME }}*.tgz ${{ env.IMAGE_REPOSITORY }}/feature
 
