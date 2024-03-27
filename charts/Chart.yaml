@@ -2,6 +2,6 @@ apiVersion: v2
 name: netroll
 description: Creates network policies to allow communication from application to database
 sources:
-  - github.com/nais/netroll/tree/main/charts/netroll
+  - github.com/nais/netroll/tree/main/charts
 type: application
 version: 1.0.1
