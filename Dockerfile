@@ -2,7 +2,7 @@ FROM golang:1.22 as builder
 ENV GOOS=linux
 ENV CGO_ENABLED=0
 ENV GO111MODULE=on
-COPY . /src
+
 WORKDIR /src
 
 # Copy the Go Modules manifests
@@ -22,7 +22,7 @@ COPY . /src
 RUN make test
 
 # Build
-RUN go build -a -installsuffix cgo -o bin/netroll cmd/netroll/main.go
+RUN make build
 
 
 FROM gcr.io/distroless/static-debian11
