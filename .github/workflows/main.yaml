@@ -31,7 +31,7 @@ jobs:
           push: ${{ github.actor != 'dependabot[bot]' && github.ref == 'refs/heads/main' }}
           cache_from: type=gha
           cache_to: type=gha,mode=max
-      - uses: azure/setup-helm@v3
+      - uses: azure/setup-helm@v4
         name: "Setup Helm"
         with:
           version: "3.12.0"
