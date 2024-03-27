@@ -23,7 +23,8 @@ type NetpolInfo struct {
 	InstanceUID  types.UID
 	InstanceName string
 	Namespace    string
-	IP           string
+	PublicIP     string
+	PrivateIP    string
 	Owner        string
 }
 
@@ -79,7 +80,12 @@ func (n *Netroller) netpolInfo(sqlInstance *unstructured.Unstructured) (*NetpolI
 		return nil, err
 	}
 
-	i, err := ip(sqlInstance)
+	pubIp, err := publicIp(sqlInstance)
+	if err != nil {
+		return nil, err
+	}
+
+	privIp, err := privateIp(sqlInstance)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +94,8 @@ func (n *Netroller) netpolInfo(sqlInstance *unstructured.Unstructured) (*NetpolI
 		InstanceUID:  sqlInstance.GetUID(),
 		InstanceName: sqlInstance.GetName(),
 		Namespace:    sqlInstance.GetNamespace(),
-		IP:           i,
+		PublicIP:     pubIp,
+		PrivateIP:    privIp,
 		Owner:        o,
 	}, nil
 }
@@ -120,7 +127,7 @@ func (n *Netroller) createNetworkPolicy(ctx context.Context, ni *NetpolInfo) err
 }
 
 func networkPolicy(i *NetpolInfo) *networkingv1.NetworkPolicy {
-	return &networkingv1.NetworkPolicy{
+	netpol := &networkingv1.NetworkPolicy{
 		ObjectMeta: v1.ObjectMeta{
 			Name: fmt.Sprintf("db-%s-%s", i.Owner, i.InstanceName),
 			OwnerReferences: []v1.OwnerReference{
@@ -141,25 +148,29 @@ func networkPolicy(i *NetpolInfo) *networkingv1.NetworkPolicy {
 					"app": i.Owner,
 				},
 			},
-			Egress: []networkingv1.NetworkPolicyEgressRule{
-				{
-					To: []networkingv1.NetworkPolicyPeer{
-						{
-							IPBlock: &networkingv1.IPBlock{
-								CIDR: fmt.Sprintf("%s/32", i.IP),
-							},
-						},
-					},
-				},
-			},
+			Egress: []networkingv1.NetworkPolicyEgressRule{},
 			PolicyTypes: []networkingv1.PolicyType{
 				networkingv1.PolicyTypeEgress,
 			},
 		},
 	}
+	for _, p := range []string{i.PublicIP, i.PrivateIP} {
+		if p != "" {
+			netpol.Spec.Egress = append(netpol.Spec.Egress, networkingv1.NetworkPolicyEgressRule{
+				To: []networkingv1.NetworkPolicyPeer{
+					{
+						IPBlock: &networkingv1.IPBlock{
+							CIDR: fmt.Sprintf("%s/32", p),
+						},
+					},
+				},
+			})
+		}
+	}
+	return netpol
 }
 
-func ip(instance *unstructured.Unstructured) (string, error) {
+func publicIp(instance *unstructured.Unstructured) (string, error) {
 	status := instance.Object["status"]
 	if status == nil {
 		return "", fmt.Errorf("cannot get publicIpAddress, sqlInstance %s has no status", instance.GetName())
@@ -172,6 +183,23 @@ func ip(instance *unstructured.Unstructured) (string, error) {
 	i := m["publicIpAddress"].(string)
 	if i == "" {
 		return "", fmt.Errorf("sqlInstance %s has empty publicIpAddress", instance.GetName())
+	}
+	return i, nil
+}
+
+func privateIp(instance *unstructured.Unstructured) (string, error) {
+	status := instance.Object["status"]
+	if status == nil {
+		return "", fmt.Errorf("cannot get private IP address, sqlInstance %s has no status", instance.GetName())
+	}
+	m := status.(map[string]any)
+	// check if privateIpAddress is available (on newly created instances, this status field may not be set yet. On instances not in the shared VPC, it will never be set)
+	if m["privateIpAddress"] == nil {
+		return "", fmt.Errorf("sqlInstance %s has no privateIpAddress", instance.GetName())
+	}
+	i := m["privateIpAddress"].(string)
+	if i == "" {
+		return "", fmt.Errorf("sqlInstance %s has empty privateIpAddress", instance.GetName())
 	}
 	return i, nil
 }
