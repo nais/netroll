@@ -60,7 +60,7 @@ func (n *Netroller) ensureNetworkPolicy(v any) {
 
 	ctx := context.Background()
 
-	netpol, err := n.netpolInfo(sqlInstance)
+	netpol, err := netpolInfo(sqlInstance)
 
 	if err != nil {
 		n.log.WithError(err).Debug("failed to get required networkPolicy info, ignoring")
@@ -72,32 +72,6 @@ func (n *Netroller) ensureNetworkPolicy(v any) {
 	}
 
 	n.log.Infof("ensured networkPolicy %s in namespace %s", netpol.Name(), netpol.Namespace)
-}
-
-func (n *Netroller) netpolInfo(sqlInstance *unstructured.Unstructured) (*NetpolInfo, error) {
-	o, err := owner(sqlInstance)
-	if err != nil {
-		return nil, err
-	}
-
-	pubIp, err := publicIp(sqlInstance)
-	if err != nil {
-		return nil, err
-	}
-
-	privIp, err := privateIp(sqlInstance)
-	if err != nil {
-		return nil, err
-	}
-
-	return &NetpolInfo{
-		InstanceUID:  sqlInstance.GetUID(),
-		InstanceName: sqlInstance.GetName(),
-		Namespace:    sqlInstance.GetNamespace(),
-		PublicIP:     pubIp,
-		PrivateIP:    privIp,
-		Owner:        o,
-	}, nil
 }
 
 func (n *Netroller) createNetworkPolicy(ctx context.Context, ni *NetpolInfo) error {
@@ -168,6 +142,28 @@ func networkPolicy(i *NetpolInfo) *networkingv1.NetworkPolicy {
 		}
 	}
 	return netpol
+}
+
+func netpolInfo(sqlInstance *unstructured.Unstructured) (*NetpolInfo, error) {
+	o, err := owner(sqlInstance)
+	if err != nil {
+		return nil, err
+	}
+
+	pubIp, pubIpErr := publicIp(sqlInstance)
+	privIp, privIpErr := privateIp(sqlInstance)
+	if pubIpErr != nil && privIpErr != nil {
+		return nil, fmt.Errorf("sqlInstance %s has no IP addresses", sqlInstance.GetName())
+	}
+
+	return &NetpolInfo{
+		InstanceUID:  sqlInstance.GetUID(),
+		InstanceName: sqlInstance.GetName(),
+		Namespace:    sqlInstance.GetNamespace(),
+		PublicIP:     pubIp,
+		PrivateIP:    privIp,
+		Owner:        o,
+	}, nil
 }
 
 func publicIp(instance *unstructured.Unstructured) (string, error) {
