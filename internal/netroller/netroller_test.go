@@ -7,8 +7,8 @@ import (
 )
 
 var _ = Describe("Netroller", func() {
-	Describe("creating network policy", func() {
-		DescribeTable("should create network policy for given IP addresses",
+	Describe("networkPolicy", func() {
+		DescribeTable("should create network policy for",
 			func(netpolInfo NetpolInfo) {
 				netpol := networkPolicy(&netpolInfo)
 
